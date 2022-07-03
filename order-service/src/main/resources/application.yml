@@ -4,7 +4,7 @@ spring:
   kafka:
     bootstrap-servers: http://localhost:9092
     producer:
-      key-serializer: org.apache.kafka.common.serialization.LongSerializer
+      key-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
       value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
     properties:
       schema.registry.url: http://localhost:8081
@@ -12,9 +12,9 @@ spring:
 
     streams:
       properties:
-        default.key.serde: org.apache.kafka.common.serialization.Serdes$LongSerde
+        default.key.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
         default.value.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
-      state-dir: /tmp/kafka-streams/1
+      state-dir: /tmp/kafka-streams/2
 
 logging:
   level:

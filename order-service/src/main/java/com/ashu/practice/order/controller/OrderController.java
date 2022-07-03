@@ -2,6 +2,7 @@ package com.ashu.practice.order.controller;
 
 import com.ashu.practice.common.Constants;
 import com.ashu.practice.common.model.Order;
+import com.ashu.practice.common.model.OrderKey;
 import com.ashu.practice.order.dto.OrderDto;
 import com.ashu.practice.order.service.OrderGeneratorService;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @RestController
 @RequestMapping("/orders")
 @Slf4j
-public record OrderController(KafkaTemplate<Long, Order> template,
+public record OrderController(KafkaTemplate<OrderKey, Order> template,
                               StreamsBuilderFactoryBean kafkaStreamsFactory,
                               OrderGeneratorService orderGeneratorService) {
 
@@ -30,7 +31,7 @@ public record OrderController(KafkaTemplate<Long, Order> template,
     @PostMapping
     public Order create(@RequestBody Order order) {
         order.setId(id.incrementAndGet());
-        template.send(Constants.TOPIC_ORDERS, order.getId(), order);
+        template.send(Constants.TOPIC_ORDERS, new OrderKey(order.getId()), order);
         log.info("Sent: {}", order);
         return order;
     }
@@ -43,15 +44,15 @@ public record OrderController(KafkaTemplate<Long, Order> template,
     @GetMapping
     public List<OrderDto> all() {
         List<OrderDto> orders = new ArrayList<>();
-        ReadOnlyKeyValueStore<Long, Order> store = kafkaStreamsFactory
+        ReadOnlyKeyValueStore<OrderKey, Order> store = kafkaStreamsFactory
                 .getKafkaStreams()
                 .store(StoreQueryParameters.fromNameAndType(
                         "orders",
                         QueryableStoreTypes.keyValueStore()));
-        KeyValueIterator<Long, Order> it = store.all();
+        KeyValueIterator<OrderKey, Order> it = store.all();
 
         while (it.hasNext()) {
-            KeyValue<Long, Order> next = it.next();
+            KeyValue<OrderKey, Order> next = it.next();
             Order order = next.value;
 //            log.info("Order in store: key={},value={}", next.key, order);
             OrderDto orderDto = OrderDto.builder()

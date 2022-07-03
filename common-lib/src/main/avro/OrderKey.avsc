@@ -1,0 +1,11 @@
+{
+  "namespace": "com.ashu.practice.common.model",
+  "type": "record",
+  "name": "OrderKey",
+  "fields": [
+    {
+      "name": "orderId",
+      "type": "long"
+    }
+  ]
+}

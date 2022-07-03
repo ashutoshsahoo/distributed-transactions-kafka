@@ -4,10 +4,10 @@ spring:
   kafka:
     bootstrap-servers: http://localhost:9092
     producer:
-      key-serializer: org.apache.kafka.common.serialization.LongSerializer
+      key-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
       value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
     consumer:
-      key-deserializer: org.apache.kafka.common.serialization.LongDeserializer
+      key-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
       value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
     properties:
       schema.registry.url: http://localhost:8081

@@ -2,6 +2,7 @@ package com.ashu.practice.payment.service;
 
 import com.ashu.practice.common.Constants;
 import com.ashu.practice.common.model.Order;
+import com.ashu.practice.common.model.OrderKey;
 import com.ashu.practice.payment.domain.Customer;
 import com.ashu.practice.payment.repository.CustomerRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 public record OrderManagementService(CustomerRepository repository,
-                                     KafkaTemplate<Long, Order> template) {
+                                     KafkaTemplate<OrderKey, Order> template) {
 
     private static final String SOURCE = "payment";
 
@@ -27,7 +28,7 @@ public record OrderManagementService(CustomerRepository repository,
         }
         order.setSource(SOURCE);
         repository.save(customer);
-        template.send(Constants.TOPIC_ORDERS_PAYMENT, order.getId(), order);
+        template.send(Constants.TOPIC_ORDERS_PAYMENT, new OrderKey(order.getId()), order);
         log.info("Sent: {}", order);
     }
 

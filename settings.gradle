@@ -1,0 +1,6 @@
+rootProject.name = 'distributed-transactions-kafka'
+include 'common-lib'
+include 'order-service'
+include 'payment-service'
+include 'stock-service'
+

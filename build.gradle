@@ -1,0 +1,14 @@
+plugins {
+    id 'java'
+}
+
+group 'com.ashu.practice'
+version '1.0.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://packages.confluent.io/maven"
+    }
+}
+

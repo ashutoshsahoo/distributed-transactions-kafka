@@ -2,6 +2,7 @@ package com.ashu.practice.order.service;
 
 import com.ashu.practice.common.Constants;
 import com.ashu.practice.common.model.Order;
+import com.ashu.practice.common.model.OrderKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -17,13 +18,13 @@ import java.util.concurrent.atomic.AtomicLong;
 public class OrderGeneratorService {
 
     public static final String SOURCE = "order";
-    private final KafkaTemplate<Long, Order> template;
+    private final KafkaTemplate<OrderKey, Order> template;
 
     @Async
     public void generate() {
         final Random secureRandom = new Random();
         final AtomicLong id = new AtomicLong();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 10000; i++) {
             int x = secureRandom.nextInt(5) + 1;
             Order o = Order.newBuilder()
                     .setId(id.incrementAndGet())
@@ -35,7 +36,7 @@ public class OrderGeneratorService {
                     .setSource(SOURCE)
                     .build();
             log.info("Generated order:{}",o);
-            template.send(Constants.TOPIC_ORDERS, o.getId(), o);
+            template.send(Constants.TOPIC_ORDERS, new OrderKey(o.getId()), o);
         }
     }
 }

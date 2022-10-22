@@ -2,6 +2,7 @@ package com.ashu.practice.order;
 
 import com.ashu.practice.common.Constants;
 import com.ashu.practice.common.model.Order;
+import com.ashu.practice.common.model.OrderKey;
 import com.ashu.practice.order.service.OrderManagementService;
 import io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde;
 import lombok.extern.slf4j.Slf4j;
@@ -40,17 +41,29 @@ public class OrderServiceApplication {
 
     @Bean
     public NewTopic topicOrder() {
-        return TopicBuilder.name(Constants.TOPIC_ORDERS).partitions(6).replicas(3).build();
+        return TopicBuilder
+                .name(Constants.TOPIC_ORDERS)
+                .partitions(6)
+                .replicas(3)
+                .build();
     }
 
     @Bean
     public NewTopic topicOrderPayment() {
-        return TopicBuilder.name(Constants.TOPIC_ORDERS_PAYMENT).partitions(6).replicas(3).build();
+        return TopicBuilder
+                .name(Constants.TOPIC_ORDERS_PAYMENT)
+                .partitions(6)
+                .replicas(3)
+                .build();
     }
 
     @Bean
     public NewTopic topicOrderStock() {
-        return TopicBuilder.name(Constants.TOPIC_ORDERS_STOCK).partitions(6).replicas(3).build();
+        return TopicBuilder
+                .name(Constants.TOPIC_ORDERS_STOCK)
+                .partitions(6)
+                .replicas(3)
+                .build();
     }
 
     @Value("${spring.kafka.properties.schema.registry.url:http://localhost:8081}")
@@ -59,39 +72,41 @@ public class OrderServiceApplication {
     @Autowired
     private OrderManagementService orderManagementService;
 
+    private Serde<OrderKey> orderKeySerde = null;
     private Serde<Order> orderValueSerde = null;
 
 
     @PostConstruct
     public void initialize() {
-        final Map<String, String> serdeConfig = Collections.singletonMap("schema.registry.url",
-                schemaRegistryUrl);
+        final Map<String, String> serdeConfig = Collections.singletonMap("schema.registry.url", schemaRegistryUrl);
+        orderKeySerde = new SpecificAvroSerde<>();
+        orderKeySerde.configure(serdeConfig, true);
         orderValueSerde = new SpecificAvroSerde<>();
         orderValueSerde.configure(serdeConfig, false);
     }
 
     @Bean
-    public KStream<Long, Order> stream(StreamsBuilder builder) {
-        KStream<Long, Order> stream = builder
-                .stream(Constants.TOPIC_ORDERS_PAYMENT, Consumed.with(Serdes.Long(), orderValueSerde));
+    public KStream<OrderKey, Order> stream(StreamsBuilder builder) {
+        KStream<OrderKey, Order> stream = builder
+                .stream(Constants.TOPIC_ORDERS_PAYMENT, Consumed.with(orderKeySerde, orderValueSerde));
 
         stream.join(builder.stream(Constants.TOPIC_ORDERS_STOCK),
                         orderManagementService::confirm,
                         JoinWindows.ofTimeDifferenceWithNoGrace(Duration.ofSeconds(10)),
-                        StreamJoined.with(Serdes.Long(), orderValueSerde, orderValueSerde))
+                        StreamJoined.with(orderKeySerde, orderValueSerde, orderValueSerde))
                 .peek((k, o) -> log.info("Output: {}", o))
                 .to(Constants.TOPIC_ORDERS);
         return stream;
     }
 
     @Bean
-    public KTable<Long, Order> table(StreamsBuilder builder) {
+    public KTable<OrderKey, Order> table(StreamsBuilder builder) {
         KeyValueBytesStoreSupplier store =
                 Stores.persistentKeyValueStore("orders");
-        KStream<Long, Order> stream = builder
-                .stream(Constants.TOPIC_ORDERS, Consumed.with(Serdes.Long(), orderValueSerde));
-        return stream.toTable(Materialized.<Long, Order>as(store)
-                .withKeySerde(Serdes.Long())
+        KStream<OrderKey, Order> stream = builder
+                .stream(Constants.TOPIC_ORDERS, Consumed.with(orderKeySerde, orderValueSerde));
+        return stream.toTable(Materialized.<OrderKey, Order>as(store)
+                .withKeySerde(orderKeySerde)
                 .withValueSerde(orderValueSerde));
     }
 

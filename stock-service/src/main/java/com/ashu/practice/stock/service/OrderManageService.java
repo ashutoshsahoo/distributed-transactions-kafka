@@ -2,6 +2,7 @@ package com.ashu.practice.stock.service;
 
 import com.ashu.practice.common.Constants;
 import com.ashu.practice.common.model.Order;
+import com.ashu.practice.common.model.OrderKey;
 import com.ashu.practice.stock.domain.Product;
 import com.ashu.practice.stock.repository.ProductRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 public record OrderManageService(ProductRepository repository,
-                                 KafkaTemplate<Long, Order> template) {
+                                 KafkaTemplate<OrderKey, Order> template) {
 
     private static final String SOURCE = "stock";
 
@@ -27,7 +28,7 @@ public record OrderManageService(ProductRepository repository,
             } else {
                 order.setStatus("REJECT");
             }
-            template.send(Constants.TOPIC_ORDERS_STOCK, order.getId(), order);
+            template.send(Constants.TOPIC_ORDERS_STOCK, new OrderKey(order.getId()), order);
             log.info("Sent: {}", order);
         }
     }

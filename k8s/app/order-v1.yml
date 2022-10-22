@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  labels:
+    app: order-service
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+      nodePort: 30001
+  type: NodePort
+  selector:
+    app: order-deployment
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: order-service
+  labels:
+    account: order-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-deployment-v1
+  labels:
+    app: order-deployment
+    version: 1.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-deployment
+      version: 1.1.0
+  template:
+    metadata:
+      labels:
+        app: order-deployment
+        version: 1.1.0
+    spec:
+      serviceAccountName: order-service
+      containers:
+        - name: order-deployment-v1
+          image: ashutoshsahoo/order-service
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: "500Mi"
+              cpu: "500m"
+            requests:
+              memory: "200Mi"
+              cpu: "200m"
+          securityContext:
+            runAsUser: 1000
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: k8s
+            - name: SPRING_KAFKA_BOOTSTRAP-SERVERS
+              value: http://my-kafka-cp-kafka-headless:9092
+            - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
+              value: http://my-kafka-cp-schema-registry:8081
+            - name: SPRING_KAFKA_STREAMS_STATE-DIR
+              value: /tmp/kafka-streams

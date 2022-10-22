@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stock-service
+  labels:
+    app: stock-service
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  type: LoadBalancer
+  selector:
+    app: stock-deployment
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: stock-service
+  labels:
+    account: stock-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stock-deployment-v1
+  labels:
+    app: stock-deployment
+    version: 1.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stock-deployment
+      version: 1.1.0
+  template:
+    metadata:
+      labels:
+        app: stock-deployment
+        version: 1.1.0
+    spec:
+      serviceAccountName: stock-service
+      containers:
+        - name: stock-deployment-v1
+          image: ashutoshsahoo/stock-service
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: "500Mi"
+              cpu: "500m"
+            requests:
+              memory: "200Mi"
+              cpu: "200m"
+          securityContext:
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: k8s
+            - name: SPRING_KAFKA_BOOTSTRAP-SERVERS
+              value: http://my-kafka-cp-kafka-headless:9092
+            - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
+              value: http://my-kafka-cp-schema-registry:8081

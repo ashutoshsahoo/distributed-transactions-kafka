@@ -1,6 +1,6 @@
 plugins {
-    id 'org.springframework.boot' version '2.7.1'
-    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+    id 'org.springframework.boot' version '2.7.4'
+    id 'io.spring.dependency-management' version '1.0.14.RELEASE'
     id 'java'
 }
 
@@ -19,10 +19,16 @@ repositories {
     }
 }
 
+ext {
+    set('springCloudVersion', "2021.0.4")
+}
+
 
 dependencies {
     implementation project(':common-lib')
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.cloud:spring-cloud-starter-sleuth'
     implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.apache.kafka:kafka-streams'
     implementation "io.confluent:kafka-avro-serializer:7.1.1"
@@ -31,3 +37,9 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok'
 }
 
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}

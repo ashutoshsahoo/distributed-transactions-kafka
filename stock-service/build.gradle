@@ -2,6 +2,7 @@ plugins {
     id 'org.springframework.boot' version '2.7.4'
     id 'io.spring.dependency-management' version '1.0.14.RELEASE'
     id 'java'
+    id 'com.palantir.docker' version '0.34.0'
 }
 
 sourceCompatibility = '17'
@@ -40,4 +41,19 @@ dependencyManagement {
     imports {
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
     }
+}
+
+
+jar {
+    enabled = false
+}
+
+
+docker {
+    dependsOn bootJar
+    name "ashutoshsahoo/${project.name}:latest"
+    buildArgs([JAR_FILE: "${project.name}.jar", VERSION: "${project.parent.version}"])
+    files bootJar
+//    tag 'latest', "${project.parent.version}"
+//    noCache true
 }

@@ -38,7 +38,7 @@ public record OrderController(KafkaTemplate<OrderKey, Order> template,
 
     @PostMapping("/generate")
     public void create() {
-        orderGeneratorService.generate();
+            orderGeneratorService.generate();
     }
 
     @GetMapping

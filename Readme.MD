@@ -72,6 +72,7 @@ helm install my-kafka -f ./k8s/kafka/values.yaml confluentinc/cp-helm-charts
 
 ```shell
 gradle clean dockerTag
+kubectl apply -f ./k8s/zipkin
 kubectl apply -f ./k8s/app
 ```
 
@@ -91,6 +92,7 @@ curl --location --request GET 'http://localhost:30001/orders'
 
 ```shell
 kubectl delete -f ./k8s/app
+kubectl delete -f ./k8s/zipkin
 helm delete my-kafka
 ```
 

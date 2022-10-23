@@ -65,8 +65,10 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
             - name: SPRING_KAFKA_BOOTSTRAP-SERVERS
-              value: http://my-kafka-cp-kafka-headless:9092
+              value: http://my-kafka-cp-kafka:9092
             - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
               value: http://my-kafka-cp-schema-registry:8081
             - name: SPRING_KAFKA_STREAMS_STATE-DIR
               value: /tmp/kafka-streams
+            - name: SPRING_ZIPKIN_BASE-URL
+              value: zipkin-service

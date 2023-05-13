@@ -35,7 +35,7 @@ public class OrderGeneratorService {
     @Async
     public void generate() {
         final AtomicLong id = new AtomicLong();
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 10; i++) {
             int x = SECURE_RANDOM.nextInt(5) + 1;
             Order o = Order.newBuilder()
                     .setId(id.incrementAndGet())

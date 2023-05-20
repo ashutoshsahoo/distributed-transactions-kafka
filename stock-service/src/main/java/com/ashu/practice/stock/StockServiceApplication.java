@@ -22,14 +22,14 @@ public class StockServiceApplication {
 		SpringApplication.run(StockServiceApplication.class, args);
 	}
 
+	private static final Random SECURE_RANDOM = new Random();
 	@Autowired
 	private ProductRepository repository;
 
 	@PostConstruct
 	public void generateData() {
-		final Random secureRandom = new Random();
 		for (int i = 0; i < 1000; i++) {
-			int count = secureRandom.nextInt(1000);
+			int count = SECURE_RANDOM.nextInt(1000);
 			Product p = new Product(null, "Product" + i, count, 0);
 			repository.save(p);
 		}

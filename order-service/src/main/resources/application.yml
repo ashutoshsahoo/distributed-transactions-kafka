@@ -24,8 +24,8 @@ logging:
   level:
     root: warn
     com.ashu.practice: DEBUG
-    io.opentelemetry.exporters: TRACE
-    org.springframework.web.servlet.DispatcherServlet: DEBUG
+#    io.opentelemetry.exporters: TRACE
+#    org.springframework.web.servlet.DispatcherServlet: DEBUG
 
 management:
   metrics:

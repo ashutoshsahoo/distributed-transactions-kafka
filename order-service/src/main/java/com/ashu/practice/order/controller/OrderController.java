@@ -6,6 +6,7 @@ import com.ashu.practice.common.model.OrderKey;
 import com.ashu.practice.order.dto.OrderDto;
 import com.ashu.practice.order.service.OrderGeneratorService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StoreQueryParameters;
 import org.apache.kafka.streams.state.KeyValueIterator;
@@ -44,27 +45,30 @@ public record OrderController(KafkaTemplate<OrderKey, Order> template,
     @GetMapping
     public List<OrderDto> all() {
         List<OrderDto> orders = new ArrayList<>();
-        ReadOnlyKeyValueStore<OrderKey, Order> store = kafkaStreamsFactory
-                .getKafkaStreams()
-                .store(StoreQueryParameters.fromNameAndType(
-                        "orders",
-                        QueryableStoreTypes.keyValueStore()));
-        KeyValueIterator<OrderKey, Order> it = store.all();
+        KafkaStreams kafkaStreams = kafkaStreamsFactory
+                .getKafkaStreams();
+        if (kafkaStreams != null) {
+            ReadOnlyKeyValueStore<OrderKey, Order> store = kafkaStreams
+                    .store(StoreQueryParameters.fromNameAndType(
+                            "orders",
+                            QueryableStoreTypes.keyValueStore()));
+            KeyValueIterator<OrderKey, Order> it = store.all();
 
-        while (it.hasNext()) {
-            KeyValue<OrderKey, Order> next = it.next();
-            Order order = next.value;
+            while (it.hasNext()) {
+                KeyValue<OrderKey, Order> next = it.next();
+                Order order = next.value;
 //            log.info("Order in store: key={},value={}", next.key, order);
-            OrderDto orderDto = OrderDto.builder()
-                    .id(order.getId())
-                    .customerId(order.getCustomerId())
-                    .productId(order.getProductId())
-                    .productCount(order.getProductCount())
-                    .price(order.getPrice())
-                    .status(order.getStatus())
-                    .source(order.getSource())
-                    .build();
-            orders.add(orderDto);
+                OrderDto orderDto = OrderDto.builder()
+                        .id(order.getId())
+                        .customerId(order.getCustomerId())
+                        .productId(order.getProductId())
+                        .productCount(order.getProductCount())
+                        .price(order.getPrice())
+                        .status(order.getStatus())
+                        .source(order.getSource())
+                        .build();
+                orders.add(orderDto);
+            }
         }
 
         return orders;

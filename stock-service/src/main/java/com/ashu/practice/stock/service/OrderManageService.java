@@ -5,6 +5,7 @@ import com.ashu.practice.common.model.Order;
 import com.ashu.practice.common.model.OrderKey;
 import com.ashu.practice.stock.domain.Product;
 import com.ashu.practice.stock.repository.ProductRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,11 @@ public record OrderManageService(ProductRepository repository,
                                  KafkaTemplate<OrderKey, Order> template) {
 
     private static final String SOURCE = "stock";
+
+    @PostConstruct
+    public void ini(){
+        template.setObservationEnabled(true);
+    }
 
     public void reserve(Order order) {
         Product product = repository.findById(order.getProductId()).orElseThrow();

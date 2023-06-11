@@ -1,4 +1,4 @@
-FROM openjdk:17-slim as builder
+FROM openjdk:17-slim AS builder
 WORKDIR /usr/local/temp
 ARG JAR_FILE=build/libs/*.jar
 ADD ${JAR_FILE} application.jar

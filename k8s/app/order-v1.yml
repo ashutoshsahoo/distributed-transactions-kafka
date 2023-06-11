@@ -9,7 +9,7 @@ spec:
     - name: http
       port: 80
       protocol: TCP
-      targetPort: 8080
+      targetPort: 80
       nodePort: 30001
   type: NodePort
   selector:
@@ -58,15 +58,19 @@ spec:
             readOnlyRootFilesystem: false
             allowPrivilegeEscalation: false
           ports:
-            - containerPort: 8080
+            - containerPort: 80
               name: http
               protocol: TCP
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
+            - name: SERVER_PORT
+              value: "80"
             - name: SPRING_KAFKA_BOOTSTRAP-SERVERS
-              value: http://my-kafka-cp-kafka-headless:9092
+              value: http://my-kafka-cp-kafka:9092
             - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
               value: http://my-kafka-cp-schema-registry:8081
             - name: SPRING_KAFKA_STREAMS_STATE-DIR
               value: /tmp/kafka-streams
+            - name: MANAGEMENT_ZIPKIN_TRACING_ENDPOINT
+              value: http://zipkin-service/api/v2/spans

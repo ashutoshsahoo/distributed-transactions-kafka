@@ -1,8 +1,39 @@
 # Distributed Transactions in Microservices with Kafka Streams and Spring Boot
 
+
+
+## Description
+There are three microservices: \
+`order-service` - it sends `Order` events to the Kafka topic and orchestrates the process of a distributed transaction \
+`payment-service` - it performs local transaction on the customer account basing on the `Order` price \
+`stock-service` - it performs local transaction on the store basing on number of products in the `Order`
+
+Here's the diagram with our architecture:
+
+![image](arch.png)
+
+(1) `order-service` send a new `Order` -> `status == NEW` \
+(2) `payment-service` and `stock-service` receive `Order` and handle it by performing a local transaction on the data \
+(3) `payment-service` and `stock-service` send a reponse `Order` -> `status == ACCEPT` or `status == REJECT` \
+(4) `order-service` process incoming stream of orders from `payment-service` and `stock-service`, join them by `Order` id and sends Order with a new status -> `status == CONFIRMATION` or `status == ROLLBACK` or `status == REJECTED` \
+(5) `payment-service` and `stock-service` receive `Order` with a final status and "commit" or "rollback" a local transaction make before
+
+
 ## Run application
 
-* Use docker to deploy kafka with registry (Use reference project to download docker compose yml file).
+* Use docker to deploy kafka with registry.
+
+Set docker host ip
+
+```sh
+export DOCKER_HOST_IP=127.0.0.1
+```
+
+or on windows powershell
+
+```powershell
+$env:DOCKER_HOST_IP = "127.0.0.1"
+```
 
 ```shell
 docker compose -f zk-single-kafka-multiple-schema-registry-ui.yml up -d
@@ -72,6 +103,7 @@ helm install my-kafka -f ./k8s/kafka/values.yaml confluentinc/cp-helm-charts
 
 ```shell
 gradle clean dockerTag
+kubectl apply -f ./k8s/zipkin
 kubectl apply -f ./k8s/app
 ```
 
@@ -91,6 +123,7 @@ curl --location --request GET 'http://localhost:30001/orders'
 
 ```shell
 kubectl delete -f ./k8s/app
+kubectl delete -f ./k8s/zipkin
 helm delete my-kafka
 ```
 

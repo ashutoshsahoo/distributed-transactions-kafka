@@ -4,9 +4,16 @@ spring:
   main:
     banner-mode: off
   kafka:
-    bootstrap-servers: http://localhost:9092
+    bootstrap-servers: ${CK_ENDPOINT}
     properties:
-      schema.registry.url: http://localhost:8081
+      sasl.mechanism: PLAIN
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username='${CK_API_KEY}' password='${CK_API_SECRET}';
+      # Required connection configs for Confluent Cloud Schema Registry
+      basic.auth.credentials.source: USER_INFO
+      basic.auth.user.info: ${CK_SR_API_KEY}:${CK_SR_API_SECRET}
+      schema.registry.url: ${CK_SR_ENDPOINT}
+      # use avro of specific type->order
       specific.avro.reader: true
     producer:
       key-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
@@ -17,7 +24,8 @@ spring:
         default.key.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
         default.value.serde: io.confluent.kafka.streams.serdes.avro.SpecificAvroSerde
       state-dir: ./build/temp/kafka-streams/2
-
+    admin:
+      fail-fast: true
 logging:
   pattern:
     level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

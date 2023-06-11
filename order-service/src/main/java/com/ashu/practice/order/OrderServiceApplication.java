@@ -68,6 +68,11 @@ public class OrderServiceApplication {
 
     @Value("${spring.kafka.properties.schema.registry.url:http://localhost:8081}")
     private String schemaRegistryUrl;
+    @Value("${spring.kafka.properties.basic.auth.credentials.source:USER_INFO}")
+    private String basicAuthCredentialsSource;
+
+    @Value("${spring.kafka.properties.basic.auth.user.info}")
+    private String basicAuthUserInfo;
 
     @Autowired
     private OrderManagementService orderManagementService;
@@ -78,7 +83,11 @@ public class OrderServiceApplication {
 
     @PostConstruct
     public void initialize() {
-        final Map<String, String> serdeConfig = Collections.singletonMap("schema.registry.url", schemaRegistryUrl);
+        final Map<String, String> serdeConfig = Map.of(
+                "schema.registry.url", schemaRegistryUrl,
+                "basic.auth.user.info", basicAuthUserInfo,
+                "basic.auth.credentials.source", basicAuthCredentialsSource
+        );
         orderKeySerde = new SpecificAvroSerde<>();
         orderKeySerde.configure(serdeConfig, true);
         orderValueSerde = new SpecificAvroSerde<>();

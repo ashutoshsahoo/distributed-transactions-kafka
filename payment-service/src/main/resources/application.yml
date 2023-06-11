@@ -1,21 +1,28 @@
 server:
-  port: 0
+  port: 0 # use random port
 spring:
   application:
     name: payment-service
   main:
     banner-mode: off
   kafka:
-    bootstrap-servers: http://localhost:9092
+    bootstrap-servers: ${CK_ENDPOINT}
+    properties:
+      sasl.mechanism: PLAIN
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username='${CK_API_KEY}' password='${CK_API_SECRET}';
+      # Required connection configs for Confluent Cloud Schema Registry
+      basic.auth.credentials.source: USER_INFO
+      basic.auth.user.info: ${CK_SR_API_KEY}:${CK_SR_API_SECRET}
+      schema.registry.url: ${CK_SR_ENDPOINT}
+      # use avro of specific type->order
+      specific.avro.reader: true
     producer:
       key-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
       value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
     consumer:
       key-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
       value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
-    properties:
-      schema.registry.url: http://localhost:8081
-      specific.avro.reader: true
 
 logging:
   pattern:

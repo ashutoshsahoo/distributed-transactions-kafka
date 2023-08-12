@@ -1,6 +1,15 @@
+pluginManagement {
+    repositories {
+        maven { url 'https://repo.spring.io/milestone' }
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = 'distributed-transactions-kafka'
 include 'common-lib'
 include 'order-service'
 include 'payment-service'
 include 'stock-service'
+
+
 

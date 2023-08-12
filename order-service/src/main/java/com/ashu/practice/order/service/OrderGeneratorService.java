@@ -11,9 +11,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -22,34 +24,43 @@ import java.util.concurrent.atomic.AtomicLong;
 public class OrderGeneratorService {
 
     public static final String SOURCE = "order";
+    private static final Random SECURE_RANDOM = new Random();
     private final KafkaTemplate<OrderKey, Order> template;
     private final Tracer tracer;
-    private static final Random SECURE_RANDOM = new Random();
-
 
     @PostConstruct
-    public void ini(){
+    public void ini() {
         template.setObservationEnabled(true);
     }
 
     @Async
     public void generate() {
+        generateOrders(10);
+    }
+
+    @Scheduled(fixedRate = 2, timeUnit = TimeUnit.MINUTES)
+    public void generateOrdersScheduled() {
+        generateOrders(1);
+    }
+
+
+    private void generateOrders(int orderCount) {
         final AtomicLong id = new AtomicLong();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < orderCount; i++) {
             int x = SECURE_RANDOM.nextInt(5) + 1;
-            Order o = Order.newBuilder()
-                    .setId(id.incrementAndGet())
-                    .setCustomerId(SECURE_RANDOM.nextLong(100) + 1)
-                    .setProductId(SECURE_RANDOM.nextLong(100) + 1)
-                    .setStatus("NEW")
-                    .setPrice(100 * x)
-                    .setProductCount(x)
+            Order o = Order.Builder
+                    .setProductCount(Order.newBuilder()
+                            .setId(id.incrementAndGet())
+                            .setCustomerId(SECURE_RANDOM.nextLong(100) + 1)
+                            .setProductId(SECURE_RANDOM.nextLong(100) + 1)
+                            .setStatus("NEW")
+                            .setPrice(100 * x), x)
                     .setSource(SOURCE)
                     .build();
-            log.info("Generated order:{}",o);
+            log.info("Generated order:{}", o);
 
             log.info("I'm in the original span");
-            Span newSpan = tracer.nextSpan().name(String.format("orderId-%s",o.getId())).start();
+            Span newSpan = tracer.nextSpan().name(String.format("orderId-%s", o.getId())).start();
             try (Tracer.SpanInScope ws = tracer.withSpan(newSpan)) {
                 log.info("I'm in the new span doing some cool work that needs its own span");
             } finally {
@@ -59,6 +70,6 @@ public class OrderGeneratorService {
 
             template.send(Constants.TOPIC_ORDERS, new OrderKey(o.getId()), o);
         }
-    }
 
+    }
 }

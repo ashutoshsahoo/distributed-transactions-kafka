@@ -22,6 +22,7 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.Duration;
@@ -32,8 +33,16 @@ import java.util.Map;
 @EnableKafkaStreams
 @EnableKafka
 @EnableAsync
+@EnableScheduling
 @Slf4j
 public class OrderServiceApplication {
+
+    @Value("${spring.kafka.properties.schema.registry.url:http://localhost:8081}")
+    private String schemaRegistryUrl;
+    @Autowired
+    private OrderManagementService orderManagementService;
+    private Serde<OrderKey> orderKeySerde = null;
+    private Serde<Order> orderValueSerde = null;
 
     public static void main(String[] args) {
         SpringApplication.run(OrderServiceApplication.class, args);
@@ -65,16 +74,6 @@ public class OrderServiceApplication {
                 .replicas(3)
                 .build();
     }
-
-    @Value("${spring.kafka.properties.schema.registry.url:http://localhost:8081}")
-    private String schemaRegistryUrl;
-
-    @Autowired
-    private OrderManagementService orderManagementService;
-
-    private Serde<OrderKey> orderKeySerde = null;
-    private Serde<Order> orderValueSerde = null;
-
 
     @PostConstruct
     public void initialize() {

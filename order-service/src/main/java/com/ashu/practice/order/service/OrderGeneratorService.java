@@ -29,7 +29,7 @@ public class OrderGeneratorService {
     private final Tracer tracer;
 
     @PostConstruct
-    public void ini() {
+    public void init() {
         template.setObservationEnabled(true);
     }
 
@@ -48,20 +48,20 @@ public class OrderGeneratorService {
         final AtomicLong id = new AtomicLong();
         for (int i = 0; i < orderCount; i++) {
             int x = SECURE_RANDOM.nextInt(5) + 1;
-            Order o = Order.Builder
-                    .setProductCount(Order.newBuilder()
-                            .setId(id.incrementAndGet())
-                            .setCustomerId(SECURE_RANDOM.nextLong(100) + 1)
-                            .setProductId(SECURE_RANDOM.nextLong(100) + 1)
-                            .setStatus("NEW")
-                            .setPrice(100 * x), x)
+            Order o = Order.newBuilder()
+                    .setId(id.incrementAndGet())
+                    .setCustomerId(SECURE_RANDOM.nextLong(100) + 1)
+                    .setProductId(SECURE_RANDOM.nextLong(100) + 1)
+                    .setStatus("NEW")
+                    .setPrice(100 * x)
+                    .setProductCount(x)
                     .setSource(SOURCE)
                     .build();
             log.info("Generated order:{}", o);
 
             log.info("I'm in the original span");
             Span newSpan = tracer.nextSpan().name(String.format("orderId-%s", o.getId())).start();
-            try (Tracer.SpanInScope ws = tracer.withSpan(newSpan)) {
+            try (Tracer.SpanInScope ignored = tracer.withSpan(newSpan)) {
                 log.info("I'm in the new span doing some cool work that needs its own span");
             } finally {
                 newSpan.end();

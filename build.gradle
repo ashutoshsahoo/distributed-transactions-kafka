@@ -1,14 +1,59 @@
 plugins {
     id 'java'
+    id 'idea'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springframework.boot' version '3.2.0' apply false
+    id 'com.palantir.docker' version '0.35.0' apply false
+    id "com.github.davidmc24.gradle.plugin.avro" version "1.9.1" apply false
 }
 
 group 'com.ashu.practice'
-version '2.1.0'
+version '3.0.0'
 
-repositories {
-    mavenCentral()
-    maven {
-        url "https://packages.confluent.io/maven"
-    }
+ext {
+    springdocOpenapiVersion = '2.3.0'
+    apacheAvroVersion = '1.11.3'
+    swaggerAnnotationsVersion = '2.2.18'
+    kafkaAvroSerializerVersion = '7.5.1'
+    datafakerVersion = '2.0.2'
 }
 
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'idea'
+    apply plugin: 'io.spring.dependency-management'
+
+    java {
+        sourceCompatibility = '21'
+    }
+
+
+    dependencyManagement {
+        imports {
+            mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+        }
+        dependencies {
+            dependency "org.springdoc:springdoc-openapi-starter-webmvc-ui:$springdocOpenapiVersion"
+            dependency "io.swagger.core.v3:swagger-annotations:$swaggerAnnotationsVersion"
+            dependency "org.apache.avro:avro:$apacheAvroVersion"
+            dependency "io.confluent:kafka-avro-serializer:$kafkaAvroSerializerVersion"
+            dependency "io.confluent:kafka-streams-avro-serde:$kafkaAvroSerializerVersion"
+            dependency "net.datafaker:datafaker:$datafakerVersion"
+        }
+
+    }
+
+    configurations {
+        compileOnly {
+            extendsFrom annotationProcessor
+        }
+    }
+
+    idea {
+        module {
+            downloadJavadoc = true
+            downloadSources = true
+        }
+    }
+}

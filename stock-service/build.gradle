@@ -1,26 +1,7 @@
 plugins {
-    id 'org.springframework.boot' version '3.2.0-M1'
-    id 'io.spring.dependency-management' version '1.1.2'
-    id 'com.palantir.docker' version '0.35.0'
-    id 'java'
-    id "idea"
+    id 'org.springframework.boot'
+    id 'com.palantir.docker'
 }
-
-sourceCompatibility = '17'
-
-configurations {
-    compileOnly {
-        extendsFrom annotationProcessor
-    }
-}
-
-repositories {
-    mavenCentral()
-    maven { url "https://repo.spring.io/milestone" }
-    maven { url "https://packages.confluent.io/maven" }
-}
-
-
 
 dependencies {
     implementation project(':common-lib')
@@ -30,7 +11,7 @@ dependencies {
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-zipkin'
     implementation 'org.springframework.kafka:spring-kafka'
-    implementation "io.confluent:kafka-avro-serializer:7.3.3"
+    implementation "io.confluent:kafka-avro-serializer"
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.h2database:h2'
     annotationProcessor 'org.projectlombok:lombok'
@@ -49,11 +30,4 @@ docker {
     files bootJar
 //    tag 'latest', "${project.parent.version}"
 //    noCache true
-}
-
-idea {
-    module {
-        downloadJavadoc = true
-        downloadSources = true
-    }
 }

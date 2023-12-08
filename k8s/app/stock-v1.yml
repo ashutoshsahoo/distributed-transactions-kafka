@@ -27,18 +27,18 @@ metadata:
   name: stock-deployment-v1
   labels:
     app: stock-deployment
-    version: 1.1.0
+    version: 3.0.0
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: stock-deployment
-      version: 1.1.0
+      version: 3.0.0
   template:
     metadata:
       labels:
         app: stock-deployment
-        version: 1.1.0
+        version: 3.0.0
     spec:
       serviceAccountName: stock-service
       containers:

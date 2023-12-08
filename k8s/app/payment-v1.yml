@@ -27,18 +27,18 @@ metadata:
   name: payment-deployment-v1
   labels:
     app: payment-deployment
-    version: 1.1.0
+    version: 3.0.0
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: payment-deployment
-      version: 1.1.0
+      version: 3.0.0
   template:
     metadata:
       labels:
         app: payment-deployment
-        version: 1.1.0
+        version: 3.0.0
     spec:
       serviceAccountName: payment-service
       containers:

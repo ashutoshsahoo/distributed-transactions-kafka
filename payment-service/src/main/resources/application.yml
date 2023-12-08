@@ -18,8 +18,6 @@ spring:
       specific.avro.reader: true
 
 logging:
-  pattern:
-    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
   level:
     root: warn
     com.ashu.practice: debug

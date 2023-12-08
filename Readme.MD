@@ -39,7 +39,7 @@ $env:DOCKER_HOST_IP = "127.0.0.1"
 docker compose -f zk-single-kafka-multiple-schema-registry-ui.yml up -d
 ```
 
-Open UI for Apache Kafka at [http://localhost:8084/](http://localhost:8084/).
+Open UI for Apache Kafka at [Kafka Control Center ](http://localhost:9021/).
 
 * Run gradle build to generate avro source files
 
@@ -55,6 +55,7 @@ gradle clean build
   cd order-service
   gradle clean bootRun
   ```
+  Open [swagger-ui](http://localhost:8080/swagger-ui/index.html).
     * payment-service
 
   ```shell

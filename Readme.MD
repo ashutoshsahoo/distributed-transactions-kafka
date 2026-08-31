@@ -1,142 +1,900 @@
 # Distributed Transactions in Microservices with Kafka Streams and Spring Boot
 
+A reference implementation of **distributed transactions across microservices using Apache Kafka, Kafka Streams and the Saga pattern**.
 
+The project demonstrates how an order workflow can span multiple independently deployed services while maintaining business consistency through **event-driven communication, local transactions and compensating actions** instead of relying on a traditional distributed database transaction.
 
-## Description
-There are three microservices: \
-`order-service` - it sends `Order` events to the Kafka topic and orchestrates the process of a distributed transaction \
-`payment-service` - it performs local transaction on the customer account basing on the `Order` price \
-`stock-service` - it performs local transaction on the store basing on number of products in the `Order`
+---
 
-Here's the diagram with our architecture:
+## 🎯 Problem Statement
 
-![image](arch.png)
+In a monolithic application, an order transaction can often be handled using a single database transaction:
 
-(1) `order-service` send a new `Order` -> `status == NEW` \
-(2) `payment-service` and `stock-service` receive `Order` and handle it by performing a local transaction on the data \
-(3) `payment-service` and `stock-service` send a reponse `Order` -> `status == ACCEPT` or `status == REJECT` \
-(4) `order-service` process incoming stream of orders from `payment-service` and `stock-service`, join them by `Order` id and sends Order with a new status -> `status == CONFIRMATION` or `status == ROLLBACK` or `status == REJECTED` \
-(5) `payment-service` and `stock-service` receive `Order` with a final status and "commit" or "rollback" a local transaction make before
+```text
+BEGIN TRANSACTION
 
+Create Order
+    ↓
+Reserve Stock
+    ↓
+Process Payment
+    ↓
+COMMIT
+```
 
-## Run application
+The problem becomes significantly more complex when these responsibilities are split across independently deployed microservices.
 
-* Use docker to deploy kafka with registry.
+For example:
 
-Set docker host ip
+```text
+Order Service
+     │
+     ├──────► Payment Service
+     │
+     └──────► Stock Service
+```
 
-```sh
+Each service owns its own business logic and local transaction boundary.
+
+A failure in one service can therefore leave the overall business operation in an inconsistent state.
+
+### Example
+
+Consider an order requiring:
+
+1. Order creation
+2. Payment authorization
+3. Inventory reservation
+
+If payment succeeds but inventory reservation fails:
+
+```text
+Order        → SUCCESS
+Payment      → SUCCESS
+Inventory    → FAILED
+```
+
+A traditional ACID transaction cannot span these independent services reliably without introducing distributed transaction coordination such as two-phase commit.
+
+This project demonstrates an alternative approach using the **Saga pattern**:
+
+```text
+Local Transaction
+       ↓
+Kafka Event
+       ↓
+Next Local Transaction
+       ↓
+Kafka Event
+       ↓
+...
+       ↓
+Success → Commit business outcome
+Failure → Execute compensating transaction
+```
+
+The objective is to achieve **eventual consistency** while keeping each service independently deployable and independently responsible for its own local transaction.
+
+---
+
+# 🏗️ High-Level Architecture
+
+The system consists of three core microservices:
+
+- **Order Service** — initiates and orchestrates the business transaction
+- **Payment Service** — processes the payment transaction
+- **Stock Service** — reserves inventory
+
+Apache Kafka provides the asynchronous communication backbone.
+
+Kafka Streams is used by the Order Service to correlate responses from Payment and Stock services and determine the final transaction state.
+
+### HLD
+
+![Architecture](./arch.png)
+
+### Logical Architecture
+
+```mermaid
+flowchart LR
+
+    Client["Client"]
+
+    Order["Order Service<br/>Saga Orchestrator"]
+
+    Kafka["Apache Kafka"]
+
+    Payment["Payment Service"]
+    Stock["Stock Service"]
+
+    PaymentDB[("Payment DB")]
+    StockDB[("Stock DB")]
+
+    Schema["Schema Registry"]
+    Zipkin["Zipkin<br/>Distributed Tracing"]
+
+    Client --> Order
+
+    Order --> Kafka
+
+    Kafka --> Payment
+    Kafka --> Stock
+
+    Payment --> PaymentDB
+    Stock --> StockDB
+
+    Payment --> Kafka
+    Stock --> Kafka
+
+    Kafka --> Order
+
+    Order -. Avro Schema .-> Schema
+    Payment -. Avro Schema .-> Schema
+    Stock -. Avro Schema .-> Schema
+
+    Order -. Trace .-> Zipkin
+    Payment -. Trace .-> Zipkin
+    Stock -. Trace .-> Zipkin
+```
+
+---
+
+# 🔄 Distributed Transaction Flow
+
+The transaction is implemented as a Saga-style workflow.
+
+## 1. Create Order
+
+The client requests a new order:
+
+```text
+Client
+   │
+   │ POST /orders/generate
+   ▼
+Order Service
+   │
+   │ Order(status = NEW)
+   ▼
+Kafka
+```
+
+---
+
+## 2. Process Payment and Stock
+
+The `Order` event is consumed by both downstream services:
+
+```text
+                 ┌───────────────┐
+                 │     Kafka     │
+                 └───────┬───────┘
+                         │
+              ┌──────────┴──────────┐
+              ▼                     ▼
+      Payment Service        Stock Service
+              │                     │
+              ▼                     ▼
+       Local Transaction      Local Transaction
+```
+
+Payment and Stock independently execute their local transactions.
+
+---
+
+## 3. Publish Transaction Results
+
+Each service publishes its result:
+
+```text
+Payment Service
+      │
+      └──► ACCEPT / REJECT
+
+Stock Service
+      │
+      └──► ACCEPT / REJECT
+```
+
+---
+
+## 4. Correlate Results
+
+The Order Service consumes the responses and correlates them using the **Order ID**.
+
+Kafka Streams is used to process the event streams and determine the overall transaction state.
+
+```text
+Payment Result ─────┐
+                    │
+                    ├──► Kafka Streams
+                    │        │
+Stock Result ───────┘        ▼
+                       Correlation
+                            │
+                            ▼
+                    Final Order Status
+```
+
+---
+
+## 5. Final Decision
+
+Depending on the responses, the Saga reaches one of several states:
+
+```text
+                 ┌──────────────┐
+                 │ Order = NEW  │
+                 └──────┬───────┘
+                        │
+              ┌─────────┴─────────┐
+              ▼                   ▼
+         Payment OK           Payment Failed
+              │
+              ▼
+          Stock OK
+              │
+        ┌─────┴─────┐
+        ▼           ▼
+   CONFIRMATION   ROLLBACK
+```
+
+Possible final states include:
+
+| State | Meaning |
+|---|---|
+| `NEW` | Order initiated |
+| `ACCEPT` | Local transaction accepted |
+| `REJECT` | Local transaction rejected |
+| `CONFIRMATION` | Distributed transaction successfully completed |
+| `ROLLBACK` | Compensation required |
+| `REJECTED` | Overall transaction failed |
+
+---
+
+# 🔁 Saga Pattern
+
+This implementation follows the **Saga orchestration** approach.
+
+The Order Service acts as the coordinator of the business workflow.
+
+```text
+              Order Service
+            Saga Orchestrator
+                   │
+          ┌────────┴────────┐
+          │                 │
+          ▼                 ▼
+     Payment Service    Stock Service
+          │                 │
+          ▼                 ▼
+      Local TX           Local TX
+          │                 │
+          └────────┬────────┘
+                   │
+                   ▼
+              Final State
+```
+
+### Successful transaction
+
+```text
+Order
+  │
+  ├──► Payment ACCEPT
+  │
+  ├──► Stock ACCEPT
+  │
+  └──► CONFIRMATION
+```
+
+### Failed transaction
+
+```text
+Order
+  │
+  ├──► Payment ACCEPT
+  │
+  ├──► Stock REJECT
+  │
+  └──► ROLLBACK
+          │
+          └──► Payment compensation
+```
+
+The important architectural principle is:
+
+> Each microservice commits its own local transaction. The overall business transaction is coordinated through events and compensating actions.
+
+---
+
+# 📨 Event-Driven Architecture
+
+Kafka acts as the messaging backbone between services.
+
+```text
+Order Service
+      │
+      │ Order Event
+      ▼
+    Kafka
+      │
+      ├──────────────► Payment Service
+      │
+      └──────────────► Stock Service
+
+Payment Service
+      │
+      │ Payment Result
+      ▼
+    Kafka
+      │
+      ▼
+Order Service
+
+Stock Service
+      │
+      │ Stock Result
+      ▼
+    Kafka
+      │
+      ▼
+Order Service
+```
+
+This provides:
+
+- Loose coupling
+- Asynchronous communication
+- Independent service deployment
+- Event-driven processing
+- Failure isolation
+- Horizontal scalability
+- Event replay capabilities
+
+---
+
+# 🧩 Technology Stack
+
+| Technology | Purpose |
+|---|---|
+| Java | Application development |
+| Spring Boot | Microservices framework |
+| Spring Kafka | Kafka integration |
+| Kafka Streams | Stream processing and correlation |
+| Apache Kafka | Event streaming backbone |
+| Apache Avro | Event serialization |
+| Confluent Schema Registry | Event schema management |
+| Gradle | Build automation |
+| Docker | Local infrastructure |
+| Kubernetes | Container orchestration |
+| Zipkin | Distributed tracing |
+
+The repository contains separate modules for `order-service`, `payment-service`, `stock-service`, a shared `common-lib`, and Kubernetes manifests.
+
+---
+
+# 📦 Project Structure
+
+```text
+distributed-transactions-kafka/
+│
+├── common-lib/
+│   └── Avro schemas and shared components
+│
+├── order-service/
+│   ├── Saga orchestration
+│   ├── Kafka Streams processing
+│   └── REST API
+│
+├── payment-service/
+│   ├── Payment processing
+│   └── Kafka consumers/producers
+│
+├── stock-service/
+│   ├── Inventory processing
+│   └── Kafka consumers/producers
+│
+├── k8s/
+│   ├── app/
+│   ├── kafka/
+│   └── zipkin/
+│
+├── arch.png
+├── build.gradle
+├── settings.gradle
+└── zk-single-kafka-multiple-schema-registry-ui.yml
+```
+
+---
+
+# 🛠️ Prerequisites
+
+Install the following:
+
+- JDK 21+
+- Gradle
+- Docker Desktop
+- Docker Compose
+- Kubernetes
+- `kubectl`
+- Helm
+
+Verify:
+
+```bash
+java -version
+gradle -version
+docker --version
+kubectl version --client
+helm version
+```
+
+---
+
+# 🚀 Run Locally with Docker
+
+The repository provides a Docker Compose environment containing Kafka, Schema Registry and Kafka UI/Control Center.
+
+## 1. Configure Docker Host
+
+### Linux / macOS
+
+```bash
 export DOCKER_HOST_IP=127.0.0.1
 ```
 
-or on windows powershell
+### Windows PowerShell
 
 ```powershell
 $env:DOCKER_HOST_IP = "127.0.0.1"
 ```
 
-```shell
+---
+
+## 2. Start Kafka Infrastructure
+
+```bash
 docker compose -f zk-single-kafka-multiple-schema-registry-ui.yml up -d
 ```
 
-Open UI for Apache Kafka at [Kafka Control Center ](http://localhost:9021/).
+Verify:
 
-* Run gradle build to generate avro source files
+```bash
+docker ps
+```
 
-```shell
+The repository also provides a Kafka Control Center UI for inspecting Kafka topics and messages.
+
+---
+
+# 🏗️ Build the Shared Library
+
+The shared library contains the common Avro-generated classes and schemas.
+
+```bash
 cd common-lib
+
 gradle clean build
 ```
 
-* Run application
-    * order-service
+---
 
-  ```shell
-  cd order-service
-  gradle clean bootRun
-  ```
-  Open [swagger-ui](http://localhost:8080/swagger-ui/index.html).
-    * payment-service
+# ▶️ Start the Microservices
 
-  ```shell
-  cd payment-service
-  gradle clean bootRun
-  ```
-    * stock-service
+Open three terminal windows.
 
-  ```shell
-  cd stock-service
-  gradle clean bootRun
-  ```
+### Terminal 1 — Order Service
 
-* Use following request to generate orders
+```bash
+cd order-service
 
-```shell
-curl --location --request POST 'http://localhost:8080/orders/generate'
+gradle clean bootRun
 ```
 
-* Use following request to check orders status
+The Order Service exposes the REST API used to create and query orders.
 
-```shell
-curl --location --request GET 'http://localhost:8080/orders'
+---
+
+### Terminal 2 — Payment Service
+
+```bash
+cd payment-service
+
+gradle clean bootRun
 ```
 
-## Stop application
+---
 
-* Use ctrl+c to cancel running applications
-* Use following command to stop and remove kafka containers
+### Terminal 3 — Stock Service
 
-```shell
-docker compose -f zk-single-kafka-multiple-schema-registry-ui.yml down
+```bash
+cd stock-service
+
+gradle clean bootRun
 ```
 
-## Kubernetes Deployment
+The current repository uses this three-service startup sequence.
 
-* Start kafka
+---
 
-```shell
-helm repo add confluentinc https://confluentinc.github.io/cp-helm-charts/
+# 🧪 Test the Distributed Transaction
+
+## Create Orders
+
+Generate an order:
+
+```bash
+curl --location --request POST \
+  'http://localhost:8080/orders/generate'
+```
+
+---
+
+## Check Order Status
+
+```bash
+curl --location --request GET \
+  'http://localhost:8080/orders'
+```
+
+The Order Service uses the responses from Payment and Stock to determine the final Saga state.
+
+---
+
+# 🔎 Observe Kafka Events
+
+Use Kafka Control Center to inspect:
+
+- Topics
+- Partitions
+- Consumer groups
+- Produced events
+- Consumed events
+- Message payloads
+- Consumer lag
+
+This makes it possible to observe the distributed transaction as it moves through the system.
+
+---
+
+# 📊 Distributed Tracing
+
+The project also includes Zipkin configuration for distributed tracing.
+
+```text
+Order Service
+      │
+      ├──── Trace ────►
+      │
+Payment Service
+      │
+      ├──── Trace ────► Zipkin
+      │
+Stock Service
+      │
+      └──── Trace ────►
+```
+
+This allows a transaction to be followed across multiple services and Kafka-based communication paths.
+
+---
+
+# ☸️ Kubernetes Deployment
+
+The repository also contains Kubernetes manifests and Kafka Helm configuration.
+
+## Start Kafka
+
+```bash
+helm repo add confluentinc \
+  https://confluentinc.github.io/cp-helm-charts/
+
 helm repo update
-helm install my-kafka -f ./k8s/kafka/values.yaml confluentinc/cp-helm-charts
+
+helm install my-kafka \
+  -f ./k8s/kafka/values.yaml \
+  confluentinc/cp-helm-charts
 ```
 
-* Application Deployment
+---
 
-```shell
+## Build Application Images
+
+```bash
 gradle clean dockerTag
+```
+
+---
+
+## Deploy Zipkin
+
+```bash
 kubectl apply -f ./k8s/zipkin
+```
+
+---
+
+## Deploy Microservices
+
+```bash
 kubectl apply -f ./k8s/app
 ```
 
-* Use following request to generate orders
+Verify:
 
-```shell
-curl --location --request POST 'http://localhost:30001/orders/generate'
+```bash
+kubectl get pods
+kubectl get svc
 ```
 
-* Use following request to check orders status
+---
 
-```shell
-curl --location --request GET 'http://localhost:30001/orders'
+## Test Through Kubernetes
+
+Generate an order:
+
+```bash
+curl --location --request POST \
+  'http://localhost:30001/orders/generate'
 ```
 
-* Clean up
+Check order status:
 
-```shell
+```bash
+curl --location --request GET \
+  'http://localhost:30001/orders'
+```
+
+The current Kubernetes configuration exposes the Order Service through port `30001`.
+
+---
+
+# 🧹 Cleanup
+
+### Local Docker Environment
+
+```bash
+docker compose \
+  -f zk-single-kafka-multiple-schema-registry-ui.yml \
+  down
+```
+
+### Kubernetes
+
+```bash
 kubectl delete -f ./k8s/app
 kubectl delete -f ./k8s/zipkin
+
 helm delete my-kafka
 ```
 
-* Expose Confluent Control Center via NodePort
+---
 
-```shell
-kubectl patch svc my-kafka-cp-control-center --type='json' -p '[{"op":"replace","path":"/spec/type","value":"NodePort"}]'
+# 🧠 Key Distributed Systems Concepts Demonstrated
+
+This project demonstrates several important distributed-systems concepts:
+
+### Distributed Transactions
+
+How to coordinate business transactions across independently deployed services.
+
+### Saga Pattern
+
+How to replace a global ACID transaction with a sequence of local transactions and compensating actions.
+
+### Saga Orchestration
+
+How a central orchestrator can coordinate multiple services through events.
+
+### Event-Driven Architecture
+
+How services communicate asynchronously using Kafka events rather than synchronous service-to-service calls.
+
+### Kafka Streams
+
+How multiple event streams can be correlated and processed to determine business state.
+
+### Eventual Consistency
+
+How distributed services can reach a consistent business state without a global database transaction.
+
+### Schema Evolution
+
+How Avro and Schema Registry can provide strongly defined event contracts between services.
+
+### Distributed Tracing
+
+How a transaction can be traced across multiple microservices.
+
+### Kubernetes
+
+How the complete event-driven system can be deployed and operated as containerized workloads.
+
+---
+
+# ⚠️ Failure Scenarios
+
+A key purpose of this project is to understand what happens when distributed transactions fail.
+
+## Payment Failure
+
+```text
+Order
+  │
+  ├──► Payment REJECT
+  │
+  └──► Order REJECTED
 ```
 
-## Reference
+No successful payment should remain committed.
 
-* [Spring Boot Kafka](https://github.com/ashutoshsahoo/gs-spring-boot-kafka)
-* [Distributed Transactions in Microservices with Kafka Streams and Spring Boot](https://piotrminkowski.com/2022/01/24/distributed-transactions-in-microservices-with-kafka-streams-and-spring-boot/)
-* [Kafka Streams Data Types and Serialization](https://docs.confluent.io/platform/current/streams/developer-guide/datatypes.html)
-* [Confluent Platform Helm Charts](https://github.com/confluentinc/cp-helm-charts)
+---
+
+## Stock Failure After Payment Success
+
+```text
+Order
+  │
+  ├──► Payment ACCEPT
+  │
+  ├──► Stock REJECT
+  │
+  └──► ROLLBACK
+          │
+          └──► Compensate Payment
+```
+
+This is the fundamental Saga compensation scenario.
+
+---
+
+# 🔐 Production Considerations
+
+This repository is primarily a reference implementation, but a production deployment would typically require additional capabilities.
+
+### Reliability
+
+- Idempotent event processing
+- Retry policies
+- Dead Letter Topics
+- Poison-message handling
+- Consumer recovery
+- Failure recovery workflows
+
+### Data Consistency
+
+- Transactional Outbox pattern
+- Idempotency keys
+- Exactly-once processing where appropriate
+- Persistent Saga state
+- Compensation tracking
+
+### Kafka
+
+- Multiple brokers
+- Replication factor
+- Partition strategy
+- Consumer-group scaling
+- Retention policies
+- Monitoring and alerting
+
+### Security
+
+- TLS
+- SASL authentication
+- Kafka ACLs
+- Secret management
+- Network policies
+
+### Observability
+
+- OpenTelemetry
+- Prometheus
+- Grafana
+- Distributed tracing
+- Structured logging
+- Consumer lag monitoring
+
+### Kubernetes
+
+- Resource requests/limits
+- Liveness/readiness probes
+- Horizontal Pod Autoscaling
+- PodDisruptionBudgets
+- NetworkPolicies
+- StatefulSets for stateful infrastructure
+- Helm-based application deployment
+
+---
+
+# 🔮 Possible Extensions
+
+The architecture can be extended with:
+
+```text
+                 ┌───────────────┐
+                 │ Order Service │
+                 └───────┬───────┘
+                         │
+                      Kafka
+                         │
+        ┌────────────────┼────────────────┐
+        ▼                ▼                ▼
+     Payment          Stock           Shipping
+      Service         Service          Service
+        │                │                │
+        └────────────────┼────────────────┘
+                         ▼
+                  Notification
+                     Service
+```
+
+Potential enhancements:
+
+- Transactional Outbox
+- Debezium CDC
+- OpenTelemetry
+- Kafka Connect
+- Dead Letter Topics
+- Retry Topics
+- Idempotent consumers
+- Persistent Saga state
+- Kafka Streams state stores
+- Resilience4j
+- Prometheus/Grafana
+- Kubernetes autoscaling
+- Chaos testing
+
+---
+
+# 📚 References
+
+- [Apache Kafka](https://kafka.apache.org/)
+- [Spring Kafka](https://spring.io/projects/spring-kafka)
+- [Kafka Streams](https://kafka.apache.org/documentation/streams/)
+- [Apache Avro](https://avro.apache.org/)
+- [Confluent Schema Registry](https://docs.confluent.io/platform/current/schema-registry/)
+- [Spring Boot](https://spring.io/projects/spring-boot)
+
+---
+
+# ⭐ Why This Project?
+
+This repository demonstrates how a traditional distributed transaction problem can be solved using **event-driven architecture and the Saga pattern**.
+
+The focus is on the architectural trade-offs involved in building distributed systems:
+
+```text
+Traditional Approach
+─────────────────────
+Global ACID Transaction
+        │
+        ▼
+Distributed Transaction Coordinator
+        │
+        ▼
+Strong Consistency
+        │
+        ▼
+Higher Coupling / Complexity
+
+
+Saga Approach
+─────────────
+Local Transactions
+        │
+        ▼
+Kafka Events
+        │
+        ▼
+Saga Orchestration
+        │
+        ▼
+Compensating Transactions
+        │
+        ▼
+Eventual Consistency
+```
+
+The project is intended as a hands-on reference for understanding **microservices, Kafka, Kafka Streams, distributed transactions, Saga orchestration, event-driven architecture, schema management, distributed tracing and Kubernetes deployment**.

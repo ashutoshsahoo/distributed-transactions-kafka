@@ -41,7 +41,7 @@ spec:
       serviceAccountName: zipkin-service
       containers:
         - name: zipkin-deployment
-          image: openzipkin/zipkin
+          image: openzipkin/zipkin:3.6.1
           imagePullPolicy: IfNotPresent
           readinessProbe:
             httpGet:

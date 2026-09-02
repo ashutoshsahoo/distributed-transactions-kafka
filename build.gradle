@@ -1,22 +1,13 @@
 plugins {
     id 'java'
     id 'idea'
-    id 'io.spring.dependency-management' version '1.1.4'
-    id 'org.springframework.boot' version '3.2.0' apply false
-    id 'com.palantir.docker' version '0.35.0' apply false
-    id "com.github.davidmc24.gradle.plugin.avro" version "1.9.1" apply false
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.springframework.boot' version '4.1.1' apply false
+    id 'com.bakdata.gradle.avro' version '2.0.1' apply false
 }
 
 group 'com.ashu.practice'
-version '3.0.0'
-
-ext {
-    springdocOpenapiVersion = '2.3.0'
-    apacheAvroVersion = '1.11.3'
-    swaggerAnnotationsVersion = '2.2.18'
-    kafkaAvroSerializerVersion = '7.5.1'
-    datafakerVersion = '2.0.2'
-}
+version "$appVersion"
 
 
 subprojects {
@@ -25,7 +16,8 @@ subprojects {
     apply plugin: 'io.spring.dependency-management'
 
     java {
-        sourceCompatibility = '21'
+        sourceCompatibility = JavaVersion.VERSION_25
+        targetCompatibility = JavaVersion.VERSION_25
     }
 
 
@@ -56,4 +48,31 @@ subprojects {
             downloadSources = true
         }
     }
+
+    plugins.withId('org.springframework.boot') {
+        tasks.named('bootRun') {
+            jvmArgs '-Dorg.apache.avro.SERIALIZABLE_PACKAGES=com.ashu.practice.common.model'
+        }
+        tasks.register('docker', Exec) {
+            group = 'docker'
+            description = "Build the ${project.name} Docker image"
+            dependsOn tasks.named('bootJar')
+            workingDir project.projectDir
+            commandLine 'docker', 'build',
+                    '--build-arg', "VERSION=${rootProject.version}",
+                    '-t', "ashutoshsahoo/${project.name}:latest",
+                    '.'
+        }
+        tasks.register('dockerTag') {
+            group = 'docker'
+            description = "Tag the ${project.name} Docker image"
+            dependsOn 'docker'
+        }
+    }
+}
+
+tasks.register('dockerTag') {
+    group = 'docker'
+    description = 'Build Docker images for all Spring Boot services'
+    dependsOn ':order-service:dockerTag', ':payment-service:dockerTag', ':stock-service:dockerTag'
 }

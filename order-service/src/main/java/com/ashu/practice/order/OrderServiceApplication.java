@@ -39,12 +39,13 @@ public class OrderServiceApplication {
 
     @Value("${spring.kafka.properties.schema.registry.url:http://localhost:8081}")
     private String schemaRegistryUrl;
+
     @Autowired
     private OrderManagementService orderManagementService;
     private Serde<OrderKey> orderKeySerde = null;
     private Serde<Order> orderValueSerde = null;
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         SpringApplication.run(OrderServiceApplication.class, args);
     }
 

@@ -19,11 +19,12 @@ import java.util.Random;
 @EnableKafka
 public class PaymentServiceApplication {
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         SpringApplication.run(PaymentServiceApplication.class, args);
     }
 
     private static final Random SECURE_RANDOM = new Random();
+
     @Autowired
     private CustomerRepository repository;
 

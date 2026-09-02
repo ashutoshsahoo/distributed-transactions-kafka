@@ -1,17 +1,17 @@
 plugins {
     id 'org.springframework.boot'
-    id 'com.palantir.docker'
 }
 
 dependencies {
     implementation project(':common-lib')
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-jackson'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
-    implementation 'io.opentelemetry:opentelemetry-exporter-zipkin'
-    implementation 'org.springframework.kafka:spring-kafka'
-    implementation "io.confluent:kafka-avro-serializer"
+    implementation 'org.springframework.boot:spring-boot-starter-kafka'
+    implementation 'org.springframework.boot:spring-boot-starter-zipkin'
+    implementation 'org.springframework.boot:spring-boot-micrometer-tracing-opentelemetry'
+    implementation 'io.confluent:kafka-avro-serializer'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.h2database:h2'
     annotationProcessor 'org.projectlombok:lombok'
@@ -20,14 +20,4 @@ dependencies {
 
 jar {
     enabled = false
-}
-
-
-docker {
-    dependsOn bootJar
-    name "ashutoshsahoo/${project.name}:latest"
-    buildArgs([JAR_FILE: "${project.name}.jar", VERSION: "${project.parent.version}"])
-    files bootJar
-//    tag 'latest', "${project.parent.version}"
-//    noCache true
 }

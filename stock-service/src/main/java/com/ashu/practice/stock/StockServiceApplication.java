@@ -18,11 +18,12 @@ import java.util.Random;
 @EnableKafka
 public class StockServiceApplication {
 
-	public static void main(String[] args) {
+	static void main(String[] args) {
 		SpringApplication.run(StockServiceApplication.class, args);
 	}
 
 	private static final Random SECURE_RANDOM = new Random();
+
 	@Autowired
 	private ProductRepository repository;
 

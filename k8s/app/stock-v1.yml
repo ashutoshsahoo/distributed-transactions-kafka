@@ -27,18 +27,18 @@ metadata:
   name: stock-deployment-v1
   labels:
     app: stock-deployment
-    version: 3.0.0
+    version: 4.0.0
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: stock-deployment
-      version: 3.0.0
+      version: 4.0.0
   template:
     metadata:
       labels:
         app: stock-deployment
-        version: 3.0.0
+        version: 4.0.0
     spec:
       serviceAccountName: stock-service
       containers:
@@ -61,13 +61,15 @@ spec:
               name: http
               protocol: TCP
           env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dorg.apache.avro.SERIALIZABLE_PACKAGES=com.ashu.practice.common.model"
             - name: SPRING_PROFILES_ACTIVE
               value: k8s
             - name: SERVER_PORT
               value: "80"
             - name: SPRING_KAFKA_BOOTSTRAP-SERVERS
-              value: http://my-kafka-cp-kafka:9092
+              value: kafka-0.kafka.svc.cluster.local:9092,kafka-1.kafka.svc.cluster.local:9092,kafka-2.kafka.svc.cluster.local:9092
             - name: SPRING_KAFKA_PROPERTIES_SCHEMA_REGISTRY_URL
-              value: http://my-kafka-cp-schema-registry:8081
+              value: http://schema-registry.kafka.svc.cluster.local:8081
             - name: MANAGEMENT_ZIPKIN_TRACING_ENDPOINT
               value: http://zipkin-service/api/v2/spans

@@ -1,0 +1,595 @@
+# Confluent Kafka + Schema Registry + Kafka UI
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+
+---
+# ============================================================
+# Kafka Broker 0
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-0
+  namespace: kafka
+spec:
+  clusterIP: None
+  selector:
+    app: kafka
+    broker: "0"
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+    - name: controller
+      port: 9093
+      targetPort: 9093
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-0-data
+  namespace: kafka
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# ============================================================
+# Kafka Broker 1
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-1
+  namespace: kafka
+spec:
+  clusterIP: None
+  selector:
+    app: kafka
+    broker: "1"
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+    - name: controller
+      port: 9093
+      targetPort: 9093
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-1-data
+  namespace: kafka
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# ============================================================
+# Kafka Broker 2
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-2
+  namespace: kafka
+spec:
+  clusterIP: None
+  selector:
+    app: kafka
+    broker: "2"
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+    - name: controller
+      port: 9093
+      targetPort: 9093
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-2-data
+  namespace: kafka
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# ============================================================
+# Kafka 0
+# ============================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka-0
+  namespace: kafka
+spec:
+  serviceName: kafka-0
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+      broker: "0"
+
+  template:
+    metadata:
+      labels:
+        app: kafka
+        broker: "0"
+
+    spec:
+      hostname: kafka-0
+
+      containers:
+        - name: kafka
+          image: confluentinc/cp-server:8.3.1
+
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 9093
+              name: controller
+
+          env:
+            - name: KAFKA_NODE_ID
+              value: "0"
+
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "0@kafka-0.kafka.svc.cluster.local:9093,1@kafka-1.kafka.svc.cluster.local:9093,2@kafka-2.kafka.svc.cluster.local:9093"
+
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka-0.kafka.svc.cluster.local:9092"
+
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data"
+
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "2"
+
+            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_MIN_INSYNC_REPLICAS
+              value: "2"
+
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+
+            - name: KAFKA_CONFLUENT_SUPPORT_CUSTOMER_ID
+              value: "anonymous"
+
+            - name: KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_JMX_PORT
+              value: "9999"
+
+            - name: CLUSTER_ID
+              value: "MkU3OEVBNTcwNTJENDM2Qk"
+
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+
+      volumes:
+        - name: kafka-data
+          persistentVolumeClaim:
+            claimName: kafka-0-data
+
+---
+# ============================================================
+# Kafka 1
+# ============================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka-1
+  namespace: kafka
+spec:
+  serviceName: kafka-1
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: kafka
+      broker: "1"
+
+  template:
+    metadata:
+      labels:
+        app: kafka
+        broker: "1"
+
+    spec:
+      hostname: kafka-1
+
+      containers:
+        - name: kafka
+          image: confluentinc/cp-server:8.3.1
+
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 9093
+              name: controller
+
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "0@kafka-0.kafka.svc.cluster.local:9093,1@kafka-1.kafka.svc.cluster.local:9093,2@kafka-2.kafka.svc.cluster.local:9093"
+
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka-1.kafka.svc.cluster.local:9092"
+
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data"
+
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "2"
+
+            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_MIN_INSYNC_REPLICAS
+              value: "2"
+
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+
+            - name: KAFKA_CONFLUENT_SUPPORT_CUSTOMER_ID
+              value: "anonymous"
+
+            - name: KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_JMX_PORT
+              value: "9999"
+
+            - name: CLUSTER_ID
+              value: "MkU3OEVBNTcwNTJENDM2Qk"
+
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+
+      volumes:
+        - name: kafka-data
+          persistentVolumeClaim:
+            claimName: kafka-1-data
+
+---
+# ============================================================
+# Kafka 2
+# ============================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka-2
+  namespace: kafka
+spec:
+  serviceName: kafka-2
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: kafka
+      broker: "2"
+
+  template:
+    metadata:
+      labels:
+        app: kafka
+        broker: "2"
+
+    spec:
+      hostname: kafka-2
+
+      containers:
+        - name: kafka
+          image: confluentinc/cp-server:8.3.1
+
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 9093
+              name: controller
+
+          env:
+            - name: KAFKA_NODE_ID
+              value: "2"
+
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "0@kafka-0.kafka.svc.cluster.local:9093,1@kafka-1.kafka.svc.cluster.local:9093,2@kafka-2.kafka.svc.cluster.local:9093"
+
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka-2.kafka.svc.cluster.local:9092"
+
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data"
+
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "2"
+
+            - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_MIN_INSYNC_REPLICAS
+              value: "2"
+
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+
+            - name: KAFKA_CONFLUENT_SUPPORT_CUSTOMER_ID
+              value: "anonymous"
+
+            - name: KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR
+              value: "3"
+
+            - name: KAFKA_JMX_PORT
+              value: "9999"
+
+            - name: CLUSTER_ID
+              value: "MkU3OEVBNTcwNTJENDM2Qk"
+
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+
+      volumes:
+        - name: kafka-data
+          persistentVolumeClaim:
+            claimName: kafka-2-data
+
+---
+# ============================================================
+# Schema Registry
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: schema-registry
+  namespace: kafka
+spec:
+  selector:
+    app: schema-registry
+  ports:
+    - name: http
+      port: 8081
+      targetPort: 8081
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schema-registry
+  namespace: kafka
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: schema-registry
+
+  template:
+    metadata:
+      labels:
+        app: schema-registry
+
+    spec:
+      # Avoid K8s injecting SCHEMA_REGISTRY_PORT (conflicts with the Confluent image).
+      enableServiceLinks: false
+      containers:
+        - name: schema-registry
+          image: confluentinc/cp-schema-registry:8.3.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              name: http
+          env:
+            # Schema Registry HTTP server
+            - name: SCHEMA_REGISTRY_HOST_NAME
+              value: "schema-registry"
+
+            - name: SCHEMA_REGISTRY_LISTENERS
+              value: "http://0.0.0.0:8081"
+
+            # IMPORTANT:
+            # Use PLAINTEXT, NOT INTERNAL
+            - name: SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS
+              value: "PLAINTEXT://kafka-0.kafka.svc.cluster.local:9092,PLAINTEXT://kafka-1.kafka.svc.cluster.local:9092,PLAINTEXT://kafka-2.kafka.svc.cluster.local:9092"
+
+            - name: SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL
+              value: "PLAINTEXT"
+
+            - name: SCHEMA_REGISTRY_KAFKASTORE_TOPIC
+              value: "_schemas"
+
+            - name: SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID
+              value: "schema-registry"
+
+          readinessProbe:
+            httpGet:
+              path: /subjects
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+
+          livenessProbe:
+            httpGet:
+              path: /subjects
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+---
+# ============================================================
+# Kafka UI
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-ui
+  namespace: kafka
+spec:
+  type: NodePort
+
+  selector:
+    app: kafka-ui
+
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30001
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-ui
+  namespace: kafka
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: kafka-ui
+
+  template:
+    metadata:
+      labels:
+        app: kafka-ui
+
+    spec:
+      containers:
+        - name: kafka-ui
+          image: provectuslabs/kafka-ui:latest
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: DYNAMIC_CONFIG_ENABLED
+              value: "false"
+
+            # ------------------------------------------------
+            # Kafka Cluster
+            # ------------------------------------------------
+            - name: KAFKA_CLUSTERS_0_NAME
+              value: "confluent-kafka"
+
+            - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
+              value: "kafka-0.kafka.svc.cluster.local:9092,kafka-1.kafka.svc.cluster.local:9092,kafka-2.kafka.svc.cluster.local:9092"
+
+            # ------------------------------------------------
+            # Schema Registry
+            # ------------------------------------------------
+            - name: KAFKA_CLUSTERS_0_SCHEMAREGISTRY
+              value: "http://schema-registry.kafka.svc.cluster.local:8081"
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 20
